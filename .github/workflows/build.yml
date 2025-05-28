@@ -2,32 +2,40 @@ name: Build OpenWRT DIR-300 B7
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      IMAGEBUILDER_URL: https://downloads.openwrt.org/releases/22.03.5/targets/ramips/rt305x/openwrt-imagebuilder-22.03.5-ramips-rt305x.Linux-x86_64.tar.xz
-      PROFILE: dlink_dir-300-b7
-      PACKAGES: "kmod-ipt-ttl iptables-mod-ttl odhcpd-ipv6only dnsmasq-full"
-    steps:
-    - uses: actions/checkout@v3
 
-    - name: Install dependencies
+    steps:
+    # 1) Забираем репозиторий
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2) Устанавливаем утилиты
+    - name: Install xz-utils
       run: sudo apt-get update && sudo apt-get install -y xz-utils
 
+    # 3) Скачиваем и распаковываем ImageBuilder
     - name: Download ImageBuilder
       run: |
-        wget $IMAGEBUILDER_URL -O imagebuilder.tar.xz
-        tar xf imagebuilder.tar.xz
+        wget https://downloads.openwrt.org/releases/22.03.5/targets/ramips/rt305x/openwrt-imagebuilder-22.03.5-ramips-rt305x.Linux-x86_64.tar.xz -O ib.tar.xz
+        tar xf ib.tar.xz
 
+    # 4) Копируем наши кастомные файлы
     - name: Copy custom files
       run: |
-        cp -a ../files ./openwrt-imagebuilder-*
+        cp -a files ./openwrt-imagebuilder-*
 
+    # 5) Собираем образ
     - name: Build firmware
+      env:
+        PROFILE: dlink_dir-300-b7
+        PACKAGES: "kmod-ipt-ttl iptables-mod-ttl odhcpd-ipv6only dnsmasq-full"
       run: |
         cd openwrt-imagebuilder-*
         make image \
@@ -36,11 +44,9 @@ jobs:
           FILES=files \
           BIN_DIR=bin
 
-    - name: Archive artifacts
+    # 6) Загружаем результаты
+    - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: openwrt-${{ env.PROFILE }}
-        path: |
-          openwrt-imagebuilder-*/bin/*.bin
-          openwrt-imagebuilder-*/bin/*.sha256
-          openwrt-imagebuilder-*/bin/*.config.buildinfo
+        name: openwrt-dir-300-b7
+        path: openwrt-imagebuilder-*/bin/*
