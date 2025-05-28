@@ -1,1 +1,49 @@
+name: Build OpenWRT DIR-300 B7
 
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGEBUILDER_URL: https://downloads.openwrt.org/releases/22.03.5/targets/ramips/rt305x/openwrt-imagebuilder-22.03.5-ramips-rt305x.Linux-x86_64.tar.xz
+      PROFILE: dlink_dir-300-b7
+      PACKAGES: "kmod-ipt-ttl iptables-mod-ttl odhcpd-ipv6only dnsmasq-full"
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y xz-utils
+
+    - name: Download ImageBuilder
+      run: |
+        wget $IMAGEBUILDER_URL -O imagebuilder.tar.xz
+        tar xf imagebuilder.tar.xz
+        cd openwrt-imagebuilder-*/ 
+
+    - name: Copy custom files
+      run: |
+        cd openwrt-imagebuilder-*
+        cp -a ../files .
+
+    - name: Build firmware
+      run: |
+        cd openwrt-imagebuilder-*
+        make image \
+          PROFILE=$PROFILE \
+          PACKAGES="$PACKAGES" \
+          FILES=files \
+          BIN_DIR=bin
+
+    - name: Archive artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: openwrt-${{ env.PROFILE }}
+        path: |
+          openwrt-imagebuilder-*/bin/*.bin
+          openwrt-imagebuilder-*/bin/*.sha256
+          openwrt-imagebuilder-*/bin/*.config.buildinfo
